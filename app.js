@@ -284,7 +284,9 @@ function renderCalendar(tipo) {
     }
 
     const feriado = state.feriados[`${state.mes}-${dayNum}`];
-    tile.className = 'day-tile' + (feriado ? ' holiday' : '');
+    const weekdayIdx = (new Date(state.anio, state.mes - 1, dayNum).getDay() + 6) % 7; // 0=Lun ... 6=Dom
+    const esFinde = weekdayIdx === 5 || weekdayIdx === 6;
+    tile.className = 'day-tile' + (esFinde ? ' weekend' : '') + (feriado ? ' holiday' : '');
 
     const numEl = document.createElement('div');
     numEl.className = 'day-num';
@@ -356,7 +358,9 @@ function renderHorizontal(tipo) {
   head.appendChild(thName);
   for (let d = 1; d <= nDias; d++) {
     const th = document.createElement('th');
-    const weekday = DIAS_SEMANA[(new Date(state.anio, state.mes - 1, d).getDay() + 6) % 7];
+    const weekdayIdx = (new Date(state.anio, state.mes - 1, d).getDay() + 6) % 7;
+    const weekday = DIAS_SEMANA[weekdayIdx];
+    if (weekdayIdx === 5 || weekdayIdx === 6) th.classList.add('weekend');
     th.innerHTML = `<span class="weekday">${weekday}</span>${d}`;
     head.appendChild(th);
   }
@@ -383,6 +387,8 @@ function renderHorizontal(tipo) {
     for (let d = 1; d <= nDias; d++) {
       const td = document.createElement('td');
       td.className = 'day-cell';
+      const weekdayIdx = (new Date(state.anio, state.mes - 1, d).getDay() + 6) % 7;
+      if (weekdayIdx === 5 || weekdayIdx === 6) td.classList.add('weekend');
       const feriado = state.feriados[`${state.mes}-${d}`];
       if (feriado) {
         td.classList.add('holiday-cell');

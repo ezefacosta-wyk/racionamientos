@@ -16,6 +16,8 @@
   --tipo-c:#6B7280;
   --tipo-f:#B3462C;
   --tipo-v:#C99A2E;
+  --weekend-bg:#DFE6E2;
+  --weekend-header:#2E4145;
   --radius:3px;
   font-size:16px;
 }
@@ -232,6 +234,7 @@ table.summary-grid{
   text-align:center;
   padding:8px 4px;
 }
+.calendar-weekdays div.weekend{background:var(--weekend-header);}
 .calendar-days{
   display:grid;
   grid-template-columns:repeat(7,1fr);
@@ -246,6 +249,7 @@ table.summary-grid{
   gap:5px;
 }
 .day-tile.pad{background:var(--paper);}
+.day-tile.weekend{background:var(--weekend-bg);}
 .day-tile .day-num{
   font-family:'IBM Plex Mono',monospace;
   font-size:12px;
@@ -552,6 +556,7 @@ table.calendar-grid{
   top:0;
   z-index:2;
 }
+.calendar-grid thead th.weekend{background:var(--weekend-header);}
 .calendar-grid .col-name{
   text-align:left;
   padding-left:12px;
@@ -578,6 +583,7 @@ table.calendar-grid{
   font-family:'IBM Plex Mono',monospace;
   font-size:11px;
 }
+.calendar-grid .day-cell.weekend{background:var(--weekend-bg);}
 .calendar-grid .day-cell:hover{background:var(--rule);}
 .calendar-grid .day-cell.holiday-cell{
   background:repeating-linear-gradient(135deg,var(--danger-soft) 0 4px,var(--paper-raised) 4px 8px);
@@ -606,6 +612,9 @@ table.calendar-grid{
   justify-content:center;
   z-index:100;
   padding:20px;
+}
+.modal-overlay[hidden]{
+  display:none;
 }
 .modal-box{
   background:var(--paper-raised);
