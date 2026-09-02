@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Registro de Presencialidad</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <span class="brand-mark">R·P</span>
+      <div class="brand-text">
+        <h1>Registro de Presencialidad</h1>
+        <p id="statusLine" class="status-line">Conectando&hellip;</p>
+      </div>
+    </div>
+    <div class="period-picker">
+      <label for="monthSelect">Mes</label>
+      <select id="monthSelect"></select>
+      <label for="yearSelect">Año</label>
+      <select id="yearSelect"></select>
+    </div>
+  </div>
+  <nav class="tabs" id="tabNav">
+    <button class="tab active" data-tab="presencial">Presencialidad</button>
+    <button class="tab" data-tab="remoto">Remoto</button>
+    <button class="tab" data-tab="resumen">Resumen anual</button>
+    <button class="tab tab-admin" data-tab="admin">Admin</button>
+  </nav>
+</header>
+
+<main id="app">
+
+  <!-- PRESENCIAL -->
+  <section class="panel active" id="panel-presencial">
+    <div class="values-strip">
+      <div class="value-field">
+        <span class="value-label">Racionamiento</span>
+        <span class="value-amount" id="racionamientoDisplay">$0</span>
+        <input type="number" class="value-input admin-only" id="racionamientoInput" min="0" step="1">
+      </div>
+      <div class="value-divider" aria-hidden="true">+</div>
+      <div class="value-field">
+        <span class="value-label">Movilidad</span>
+        <span class="value-amount" id="movilidadDisplay">$0</span>
+        <input type="number" class="value-input admin-only" id="movilidadInput" min="0" step="1">
+      </div>
+      <button class="btn-save-values admin-only" id="saveValuesBtn">Guardar valores del mes</button>
+      <p class="values-hint">El total de cada persona se calcula: (Racionamiento + Movilidad) &times; días presentes.</p>
+    </div>
+    <div class="grid-wrap">
+      <table class="calendar-grid" id="gridPresencial">
+        <thead><tr id="headPresencial"></tr></thead>
+        <tbody id="bodyPresencial"></tbody>
+        <tfoot><tr id="footPresencial"></tr></tfoot>
+      </table>
+    </div>
+    <p class="empty-state" id="emptyPresencial" hidden>Todavía no hay personas cargadas. Pedile al admin que las agregue en la pestaña Admin.</p>
+  </section>
+
+  <!-- REMOTO -->
+  <section class="panel" id="panel-remoto">
+    <div class="grid-wrap">
+      <table class="calendar-grid" id="gridRemoto">
+        <thead><tr id="headRemoto"></tr></thead>
+        <tbody id="bodyRemoto"></tbody>
+        <tfoot><tr id="footRemoto"></tr></tfoot>
+      </table>
+    </div>
+    <p class="empty-state" id="emptyRemoto" hidden>Todavía no hay personas cargadas. Pedile al admin que las agregue en la pestaña Admin.</p>
+  </section>
+
+  <!-- RESUMEN -->
+  <section class="panel" id="panel-resumen">
+    <div class="resumen-block">
+      <h2>Total presencialidad ($) por mes &mdash; <span id="resumenYear1"></span></h2>
+      <div class="grid-wrap">
+        <table class="summary-grid" id="resumenMoney"></table>
+      </div>
+    </div>
+    <div class="resumen-block">
+      <h2>Días remotos por mes &mdash; <span id="resumenYear2"></span></h2>
+      <div class="grid-wrap">
+        <table class="summary-grid" id="resumenRemoto"></table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ADMIN -->
+  <section class="panel" id="panel-admin">
+    <div class="admin-lock" id="adminLock">
+      <h2>Acceso de administrador</h2>
+      <p>Ingresá el código de administrador para agregar o quitar personas y editar los valores del mes.</p>
+      <input type="password" id="adminPasscode" placeholder="Código">
+      <button id="adminUnlockBtn">Ingresar</button>
+      <p class="admin-error" id="adminError" hidden>Código incorrecto.</p>
+    </div>
+    <div class="admin-panel" id="adminPanel" hidden>
+      <div class="admin-panel-head">
+        <h2>Personas</h2>
+        <button id="adminLockBtn" class="btn-secondary">Cerrar sesión de admin</button>
+      </div>
+      <form id="addPersonForm" class="add-person-form">
+        <input type="text" id="newPersonName" placeholder="Nombre y apellido" required>
+        <button type="submit">Agregar persona</button>
+      </form>
+      <ul class="person-list" id="personList"></ul>
+    </div>
+  </section>
+
+</main>
+
+<div class="toast" id="toast" hidden></div>
+
+<script type="module" src="firebase-config.js"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>

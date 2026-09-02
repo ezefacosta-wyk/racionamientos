@@ -1,0 +1,30 @@
+rules_version = '2';
+
+// Estas reglas dejan la base de datos abierta a lectura y escritura para
+// cualquiera que tenga la configuración de Firebase (la que está en
+// firebase-config.js, visible en el código fuente de la web).
+// Es la opción mas simple, elegida a propósito por no requerir login.
+//
+// OJO: esto significa que, tecnicamente, no solo tus compañeros sino
+// cualquiera que encuentre estos datos podria leer o modificar la
+// informacion. Como mitigación minima, el código de administrador (en
+// firebase-config.js) evita que cualquiera agregue/quite personas o
+// cambie racionamiento/movilidad desde la interfaz, pero no evita que
+// alguien lo haga directamente contra Firestore si consigue la config.
+// Si en algun momento queres mas seguridad, la mejora natural es sumar
+// Firebase Authentication (aunque sea "Acceso anónimo") y restringir
+// estas reglas a "request.auth != null".
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /personas/{personaId} {
+      allow read, write: if true;
+    }
+    match /marcas/{marcaId} {
+      allow read, write: if true;
+    }
+    match /valoresMensuales/{valorId} {
+      allow read, write: if true;
+    }
+  }
+}
