@@ -54,32 +54,28 @@
       <button class="btn-save-values admin-only" id="saveValuesBtn">Guardar valores del mes</button>
       <p class="values-hint">El total de cada persona se calcula: (Racionamiento + Movilidad) &times; días presentes.</p>
     </div>
-    <div class="grid-wrap">
-      <table class="calendar-grid" id="gridPresencial">
-        <thead><tr id="headPresencial"></tr></thead>
-        <tbody id="bodyPresencial"></tbody>
-        <tfoot><tr id="footPresencial"></tr></tfoot>
-      </table>
-    </div>
+    <div class="calendar-wrap" id="calendarPresencial"></div>
     <p class="empty-state" id="emptyPresencial" hidden>Todavía no hay personas cargadas. Pedile al admin que las agregue en la pestaña Admin.</p>
+    <div class="summary-table-wrap">
+      <h3>Totales del mes</h3>
+      <table class="summary-mini" id="summaryPresencial"></table>
+    </div>
   </section>
 
   <!-- REMOTO -->
   <section class="panel" id="panel-remoto">
-    <div class="grid-wrap">
-      <table class="calendar-grid" id="gridRemoto">
-        <thead><tr id="headRemoto"></tr></thead>
-        <tbody id="bodyRemoto"></tbody>
-        <tfoot><tr id="footRemoto"></tr></tfoot>
-      </table>
-    </div>
+    <div class="calendar-wrap" id="calendarRemoto"></div>
     <p class="empty-state" id="emptyRemoto" hidden>Todavía no hay personas cargadas. Pedile al admin que las agregue en la pestaña Admin.</p>
+    <div class="summary-table-wrap">
+      <h3>Totales del mes</h3>
+      <table class="summary-mini" id="summaryRemoto"></table>
+    </div>
   </section>
 
   <!-- RESUMEN -->
   <section class="panel" id="panel-resumen">
     <div class="resumen-block">
-      <h2>Total presencialidad ($) por mes &mdash; <span id="resumenYear1"></span></h2>
+      <h2>Presencialidad ($) por mes &mdash; <span id="resumenYear1"></span></h2>
       <div class="grid-wrap">
         <table class="summary-grid" id="resumenMoney"></table>
       </div>
@@ -111,6 +107,17 @@
         <button type="submit">Agregar persona</button>
       </form>
       <ul class="person-list" id="personList"></ul>
+
+      <div class="admin-section">
+        <h2>Feriados de <span id="feriadosYearLabel"></span></h2>
+        <p class="admin-section-hint">Un día marcado como feriado se ve reflejado tanto en Presencialidad como en Remoto, y no se puede marcar en ese día.</p>
+        <form id="addFeriadoForm" class="add-feriado-form">
+          <input type="date" id="newFeriadoDate" required>
+          <input type="text" id="newFeriadoName" placeholder="Nombre (opcional)">
+          <button type="submit">Agregar feriado</button>
+        </form>
+        <ul class="feriado-list" id="feriadoList"></ul>
+      </div>
     </div>
   </section>
 
