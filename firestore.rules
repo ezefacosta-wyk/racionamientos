@@ -26,5 +26,8 @@ service cloud.firestore {
     match /valoresMensuales/{valorId} {
       allow read, write: if true;
     }
+    match /feriados/{feriadoId} {
+      allow read, write: if true;
+    }
   }
 }

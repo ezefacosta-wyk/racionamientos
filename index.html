@@ -20,11 +20,17 @@
         <p id="statusLine" class="status-line">Conectando&hellip;</p>
       </div>
     </div>
-    <div class="period-picker">
-      <label for="monthSelect">Mes</label>
-      <select id="monthSelect"></select>
-      <label for="yearSelect">Año</label>
-      <select id="yearSelect"></select>
+    <div class="topbar-controls">
+      <div class="view-toggle" id="viewToggle">
+        <button class="view-btn active" data-view="calendario" type="button">Calendario</button>
+        <button class="view-btn" data-view="horizontal" type="button">Horizontal</button>
+      </div>
+      <div class="period-picker">
+        <label for="monthSelect">Mes</label>
+        <select id="monthSelect"></select>
+        <label for="yearSelect">Año</label>
+        <select id="yearSelect"></select>
+      </div>
     </div>
   </div>
   <nav class="tabs" id="tabNav">
@@ -52,9 +58,30 @@
         <input type="number" class="value-input admin-only" id="movilidadInput" min="0" step="1">
       </div>
       <button class="btn-save-values admin-only" id="saveValuesBtn">Guardar valores del mes</button>
-      <p class="values-hint">El total de cada persona se calcula: (Racionamiento + Movilidad) &times; días presentes.</p>
+      <p class="values-hint">El total de cada persona se calcula: (Racionamiento + Movilidad) &times; días con EZE o BOU.</p>
     </div>
-    <div class="calendar-wrap" id="calendarPresencial"></div>
+
+    <div class="type-legend">
+      <span class="legend-item"><span class="legend-dot dot-eze"></span>EZE Ezeiza</span>
+      <span class="legend-item"><span class="legend-dot dot-bou"></span>BOU Bouchard</span>
+      <span class="legend-item"><span class="legend-dot dot-c"></span>C Comisión</span>
+      <span class="legend-item"><span class="legend-dot dot-f"></span>F Falta</span>
+      <span class="legend-item"><span class="legend-dot dot-v"></span>V Vacaciones</span>
+      <span class="legend-note">EZE y BOU cuentan para el total. C, F y V no.</span>
+    </div>
+
+    <div class="calendar-view" id="calendarViewPresencial">
+      <div class="calendar-wrap" id="calendarPresencial"></div>
+    </div>
+    <div class="horizontal-view" id="horizontalViewPresencial" hidden>
+      <div class="grid-wrap">
+        <table class="calendar-grid" id="gridPresencial">
+          <thead><tr id="headPresencial"></tr></thead>
+          <tbody id="bodyPresencial"></tbody>
+        </table>
+      </div>
+    </div>
+
     <p class="empty-state" id="emptyPresencial" hidden>Todavía no hay personas cargadas. Pedile al admin que las agregue en la pestaña Admin.</p>
     <div class="summary-table-wrap">
       <h3>Totales del mes</h3>
@@ -64,7 +91,17 @@
 
   <!-- REMOTO -->
   <section class="panel" id="panel-remoto">
-    <div class="calendar-wrap" id="calendarRemoto"></div>
+    <div class="calendar-view" id="calendarViewRemoto">
+      <div class="calendar-wrap" id="calendarRemoto"></div>
+    </div>
+    <div class="horizontal-view" id="horizontalViewRemoto" hidden>
+      <div class="grid-wrap">
+        <table class="calendar-grid" id="gridRemoto">
+          <thead><tr id="headRemoto"></tr></thead>
+          <tbody id="bodyRemoto"></tbody>
+        </table>
+      </div>
+    </div>
     <p class="empty-state" id="emptyRemoto" hidden>Todavía no hay personas cargadas. Pedile al admin que las agregue en la pestaña Admin.</p>
     <div class="summary-table-wrap">
       <h3>Totales del mes</h3>
@@ -74,12 +111,6 @@
 
   <!-- RESUMEN -->
   <section class="panel" id="panel-resumen">
-    <div class="resumen-block">
-      <h2>Presencialidad ($) por mes &mdash; <span id="resumenYear1"></span></h2>
-      <div class="grid-wrap">
-        <table class="summary-grid" id="resumenMoney"></table>
-      </div>
-    </div>
     <div class="resumen-block">
       <h2>Días remotos por mes &mdash; <span id="resumenYear2"></span></h2>
       <div class="grid-wrap">
@@ -122,6 +153,18 @@
   </section>
 
 </main>
+
+<!-- Selector de tipo de marca (presencial) -->
+<div class="modal-overlay" id="markerModal" hidden>
+  <div class="modal-box">
+    <h3 id="markerModalTitle"></h3>
+    <div class="marker-options" id="markerOptions"></div>
+    <div class="modal-actions">
+      <button class="btn-remove-mark" id="markerRemoveBtn">Quitar marca</button>
+      <button class="btn-secondary" id="markerCancelBtn">Cancelar</button>
+    </div>
+  </div>
+</div>
 
 <div class="toast" id="toast" hidden></div>
 

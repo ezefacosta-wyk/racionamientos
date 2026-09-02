@@ -2,7 +2,7 @@ import { firebaseConfig, ADMIN_PASSCODE } from './firebase-config.js';
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
 import {
   getFirestore, collection, doc, onSnapshot, query, where,
-  setDoc, addDoc, deleteDoc, getDocs, serverTimestamp
+  setDoc, addDoc, deleteDoc, getDocs, serverTimestamp, deleteField
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 // ---------------------------------------------------------------
@@ -27,6 +27,21 @@ const MESES = [
 // Encabezado de dias, empezando el lunes (convencion local).
 const DIAS_SEMANA = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
+// Opciones de marca de presencialidad. EZE y BOU cuentan para el total;
+// C, F y V se registran pero no suman dias ni monto.
+const TIPOS_PRESENCIAL = [
+  { code: 'EZE', label: 'Ezeiza', cuenta: true },
+  { code: 'BOU', label: 'Bouchard', cuenta: true },
+  { code: 'C', label: 'Comisión', cuenta: false },
+  { code: 'F', label: 'Falta', cuenta: false },
+  { code: 'V', label: 'Vacaciones', cuenta: false }
+];
+const TIPO_DEFAULT = 'EZE';
+function cuentaParaTotal(code) {
+  const t = TIPOS_PRESENCIAL.find(t => t.code === code);
+  return t ? t.cuenta : false;
+}
+
 function diasEnMes(anio, mes) {
   return new Date(anio, mes, 0).getDate();
 }
@@ -38,6 +53,12 @@ function initials(nombre) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
+function escapeHtml(s) {
+  const div = document.createElement('div');
+  div.textContent = s;
+  return div.innerHTML;
+}
+
 // ---------------------------------------------------------------
 // Estado
 // ---------------------------------------------------------------
@@ -45,12 +66,13 @@ const today = new Date();
 let state = {
   anio: today.getFullYear(),
   mes: today.getMonth() + 1,
-  personas: [],           // [{id, nombre, orden}]
-  marcasPresencial: {},   // { personaId: [dias...] }
-  marcasRemoto: {},       // { personaId: [dias...] }
-  feriados: {},           // { "mes-dia": {nombre} } para el anio actual
+  personas: [],             // [{id, nombre, orden}]
+  marcasPresencial: {},     // { personaId: { "5": "EZE", "6": "BOU", ... } }
+  marcasRemoto: {},         // { personaId: [dias...] }
+  feriados: {},             // { "mes-dia": {id, nombre} } para el anio actual
   valores: { racionamiento: 0, movilidad: 0 },
-  isAdmin: sessionStorage.getItem('isAdmin') === 'true'
+  isAdmin: sessionStorage.getItem('isAdmin') === 'true',
+  vista: localStorage.getItem('vistaPreferida') || 'calendario'
 };
 
 let unsubPersonas = null;
@@ -94,6 +116,27 @@ yearSelect.addEventListener('change', () => {
 });
 
 // ---------------------------------------------------------------
+// Toggle de vista (Calendario / Horizontal)
+// ---------------------------------------------------------------
+function applyViewState() {
+  document.querySelectorAll('.view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === state.vista));
+  const esCal = state.vista === 'calendario';
+  document.getElementById('calendarViewPresencial').hidden = !esCal;
+  document.getElementById('horizontalViewPresencial').hidden = esCal;
+  document.getElementById('calendarViewRemoto').hidden = !esCal;
+  document.getElementById('horizontalViewRemoto').hidden = esCal;
+}
+document.getElementById('viewToggle').addEventListener('click', (e) => {
+  const btn = e.target.closest('.view-btn');
+  if (!btn) return;
+  state.vista = btn.dataset.view;
+  localStorage.setItem('vistaPreferida', state.vista);
+  applyViewState();
+  renderAll();
+});
+applyViewState();
+
+// ---------------------------------------------------------------
 // Tabs
 // ---------------------------------------------------------------
 let currentTab = 'presencial';
@@ -122,7 +165,7 @@ function subscribeToPeriod() {
     where('anio', '==', state.anio), where('mes', '==', state.mes), where('tipo', '==', 'presencial'));
   unsubPresencial = onSnapshot(qPres, (snap) => {
     state.marcasPresencial = {};
-    snap.forEach(d => { state.marcasPresencial[d.data().personaId] = d.data().dias || []; });
+    snap.forEach(d => { state.marcasPresencial[d.data().personaId] = d.data().dias || {}; });
     renderAll();
   }, (err) => setStatus('Error leyendo presencialidad: ' + err.message, 'error'));
 
@@ -178,14 +221,26 @@ function formatMoney(n) {
 }
 
 function renderAll() {
-  renderCalendar('presencial');
-  renderCalendar('remoto');
+  if (state.vista === 'calendario') {
+    renderCalendar('presencial');
+    renderCalendar('remoto');
+  } else {
+    renderHorizontal('presencial');
+    renderHorizontal('remoto');
+  }
   renderSummary('presencial');
   renderSummary('remoto');
 }
 
 // ---------------------------------------------------------------
-// Calendario mensual (semanas x 7 dias) con chips por persona
+// Helpers de conteo
+// ---------------------------------------------------------------
+function diasQueCuentanPresencial(mapaDias) {
+  return Object.values(mapaDias || {}).filter(code => cuentaParaTotal(code)).length;
+}
+
+// ---------------------------------------------------------------
+// Vista Calendario (semanas x 7 dias) con chips por persona
 // ---------------------------------------------------------------
 function renderCalendar(tipo) {
   const wrap = document.getElementById(tipo === 'presencial' ? 'calendarPresencial' : 'calendarRemoto');
@@ -199,7 +254,6 @@ function renderCalendar(tipo) {
   wrap.style.display = '';
   emptyState.hidden = true;
 
-  const marcas = tipo === 'presencial' ? state.marcasPresencial : state.marcasRemoto;
   const nDias = diasEnMes(state.anio, state.mes);
   const firstOfMonth = new Date(state.anio, state.mes - 1, 1);
   const leadingBlank = (firstOfMonth.getDay() + 6) % 7; // 0 = lunes
@@ -247,14 +301,24 @@ function renderCalendar(tipo) {
     const chipRow = document.createElement('div');
     chipRow.className = 'chip-row';
     state.personas.forEach(p => {
-      const diasMarcados = marcas[p.id] || [];
-      const marked = diasMarcados.includes(dayNum);
       const chip = document.createElement('div');
-      chip.className = 'chip tipo-' + tipo + (marked ? ' chip-on' : '') + (feriado ? ' chip-disabled' : '');
-      chip.textContent = initials(p.nombre);
-      chip.title = p.nombre + (feriado ? ' — no disponible en feriado' : '');
+      let marked, code;
+      if (tipo === 'presencial') {
+        const mapaDias = state.marcasPresencial[p.id] || {};
+        code = mapaDias[dayNum];
+        marked = !!code;
+        chip.className = 'chip' + (marked ? ' chip-on mark-' + code : '') + (feriado ? ' chip-disabled' : '');
+        chip.textContent = marked ? code[0] : initials(p.nombre);
+        chip.title = p.nombre + (marked ? ' — ' + code : '') + (feriado ? ' — no disponible en feriado' : '');
+      } else {
+        const diasMarcados = state.marcasRemoto[p.id] || [];
+        marked = diasMarcados.includes(dayNum);
+        chip.className = 'chip tipo-remoto' + (marked ? ' chip-on' : '') + (feriado ? ' chip-disabled' : '');
+        chip.textContent = initials(p.nombre);
+        chip.title = p.nombre + (feriado ? ' — no disponible en feriado' : '');
+      }
       if (!feriado) {
-        chip.addEventListener('click', () => toggleDia(tipo, p.id, dayNum, diasMarcados));
+        chip.addEventListener('click', () => handleMarkClick(tipo, p, dayNum));
       }
       chipRow.appendChild(chip);
     });
@@ -266,19 +330,182 @@ function renderCalendar(tipo) {
   wrap.appendChild(daysEl);
 }
 
-async function toggleDia(tipo, personaId, dia, diasActuales) {
+// ---------------------------------------------------------------
+// Vista Horizontal (tabla: persona x dias 1..N)
+// ---------------------------------------------------------------
+function renderHorizontal(tipo) {
+  const head = document.getElementById(tipo === 'presencial' ? 'headPresencial' : 'headRemoto');
+  const body = document.getElementById(tipo === 'presencial' ? 'bodyPresencial' : 'bodyRemoto');
+  const emptyState = document.getElementById(tipo === 'presencial' ? 'emptyPresencial' : 'emptyRemoto');
+  const view = document.getElementById(tipo === 'presencial' ? 'horizontalViewPresencial' : 'horizontalViewRemoto');
+
+  if (!state.personas.length) {
+    view.style.display = 'none';
+    emptyState.hidden = false;
+    return;
+  }
+  view.style.display = '';
+  emptyState.hidden = true;
+
+  const nDias = diasEnMes(state.anio, state.mes);
+
+  head.innerHTML = '';
+  const thName = document.createElement('th');
+  thName.className = 'col-name';
+  thName.textContent = 'Persona';
+  head.appendChild(thName);
+  for (let d = 1; d <= nDias; d++) {
+    const th = document.createElement('th');
+    const weekday = DIAS_SEMANA[(new Date(state.anio, state.mes - 1, d).getDay() + 6) % 7];
+    th.innerHTML = `<span class="weekday">${weekday}</span>${d}`;
+    head.appendChild(th);
+  }
+  const thDias = document.createElement('th');
+  thDias.textContent = 'Días';
+  head.appendChild(thDias);
+  if (tipo === 'presencial') {
+    const thTotal = document.createElement('th');
+    thTotal.textContent = 'Total $';
+    head.appendChild(thTotal);
+  }
+
+  body.innerHTML = '';
+  state.personas.forEach(p => {
+    const tr = document.createElement('tr');
+    const tdName = document.createElement('td');
+    tdName.className = 'col-name';
+    tdName.textContent = p.nombre;
+    tr.appendChild(tdName);
+
+    const mapaDias = tipo === 'presencial' ? (state.marcasPresencial[p.id] || {}) : null;
+    const diasMarcadosRemoto = tipo === 'remoto' ? (state.marcasRemoto[p.id] || []) : null;
+
+    for (let d = 1; d <= nDias; d++) {
+      const td = document.createElement('td');
+      td.className = 'day-cell';
+      const feriado = state.feriados[`${state.mes}-${d}`];
+      if (feriado) {
+        td.classList.add('holiday-cell');
+        td.title = 'Feriado' + (feriado.nombre ? ' — ' + feriado.nombre : '');
+      } else if (tipo === 'presencial') {
+        const code = mapaDias[d];
+        if (code) { td.classList.add('mark-' + code); td.textContent = code; }
+        td.addEventListener('click', () => handleMarkClick(tipo, p, d));
+      } else {
+        const marked = diasMarcadosRemoto.includes(d);
+        if (marked) { td.classList.add('mark-remoto'); td.textContent = 'X'; }
+        td.addEventListener('click', () => handleMarkClick(tipo, p, d));
+      }
+      tr.appendChild(td);
+    }
+
+    const cantidad = tipo === 'presencial' ? diasQueCuentanPresencial(mapaDias) : diasMarcadosRemoto.length;
+    const tdDias = document.createElement('td');
+    tdDias.className = 'col-total';
+    tdDias.textContent = cantidad;
+    tr.appendChild(tdDias);
+
+    if (tipo === 'presencial') {
+      const total = (Number(state.valores.racionamiento || 0) + Number(state.valores.movilidad || 0)) * cantidad;
+      const tdTotal = document.createElement('td');
+      tdTotal.className = 'col-total';
+      tdTotal.textContent = formatMoney(total);
+      tr.appendChild(tdTotal);
+    }
+
+    body.appendChild(tr);
+  });
+}
+
+// ---------------------------------------------------------------
+// Click en una celda/chip: remoto alterna directo; presencial
+// marca EZE por defecto, o abre el selector si ya estaba marcado.
+// ---------------------------------------------------------------
+function handleMarkClick(tipo, persona, dia) {
+  if (tipo === 'remoto') {
+    const diasActuales = state.marcasRemoto[persona.id] || [];
+    toggleRemoto(persona.id, dia, diasActuales);
+    return;
+  }
+  const mapaDias = state.marcasPresencial[persona.id] || {};
+  const codeActual = mapaDias[dia];
+  if (!codeActual) {
+    setMarcaPresencial(persona.id, dia, TIPO_DEFAULT);
+  } else {
+    openMarkerModal(persona, dia, codeActual);
+  }
+}
+
+async function toggleRemoto(personaId, dia, diasActuales) {
   const nuevo = diasActuales.includes(dia)
     ? diasActuales.filter(d => d !== dia)
     : [...diasActuales, dia].sort((a, b) => a - b);
-  const ref = doc(db, 'marcas', `${personaId}_${state.anio}_${mesId()}_${tipo}`);
+  const ref = doc(db, 'marcas', `${personaId}_${state.anio}_${mesId()}_remoto`);
   try {
-    await setDoc(ref, {
-      personaId, anio: state.anio, mes: state.mes, tipo, dias: nuevo
-    });
+    await setDoc(ref, { personaId, anio: state.anio, mes: state.mes, tipo: 'remoto', dias: nuevo });
   } catch (err) {
     showToast('No se pudo guardar: ' + err.message);
   }
 }
+
+async function setMarcaPresencial(personaId, dia, code) {
+  const ref = doc(db, 'marcas', `${personaId}_${state.anio}_${mesId()}_presencial`);
+  try {
+    await setDoc(ref, {
+      personaId, anio: state.anio, mes: state.mes, tipo: 'presencial',
+      dias: { [dia]: code }
+    }, { merge: true });
+  } catch (err) {
+    showToast('No se pudo guardar: ' + err.message);
+  }
+}
+
+async function quitarMarcaPresencial(personaId, dia) {
+  const ref = doc(db, 'marcas', `${personaId}_${state.anio}_${mesId()}_presencial`);
+  try {
+    await setDoc(ref, { dias: { [dia]: deleteField() } }, { merge: true });
+  } catch (err) {
+    showToast('No se pudo guardar: ' + err.message);
+  }
+}
+
+// ---------------------------------------------------------------
+// Modal selector de tipo de marca (presencial)
+// ---------------------------------------------------------------
+const markerModal = document.getElementById('markerModal');
+let markerCtx = null; // { personaId, dia }
+
+function openMarkerModal(persona, dia, codeActual) {
+  markerCtx = { personaId: persona.id, dia };
+  document.getElementById('markerModalTitle').textContent = `${persona.nombre} — día ${dia}`;
+  const opts = document.getElementById('markerOptions');
+  opts.innerHTML = '';
+  TIPOS_PRESENCIAL.forEach(t => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'marker-option opt-' + t.code + (t.code === codeActual ? ' selected' : '');
+    btn.innerHTML = `<span class="code">${t.code}</span><span class="label">${t.label}</span>`;
+    btn.addEventListener('click', async () => {
+      await setMarcaPresencial(markerCtx.personaId, markerCtx.dia, t.code);
+      closeMarkerModal();
+    });
+    opts.appendChild(btn);
+  });
+  markerModal.hidden = false;
+}
+function closeMarkerModal() {
+  markerModal.hidden = true;
+  markerCtx = null;
+}
+document.getElementById('markerCancelBtn').addEventListener('click', closeMarkerModal);
+document.getElementById('markerRemoveBtn').addEventListener('click', async () => {
+  if (!markerCtx) return;
+  await quitarMarcaPresencial(markerCtx.personaId, markerCtx.dia);
+  closeMarkerModal();
+});
+markerModal.addEventListener('click', (e) => {
+  if (e.target === markerModal) closeMarkerModal();
+});
 
 // ---------------------------------------------------------------
 // Tabla resumen del mes (sin fila de total general)
@@ -287,12 +514,16 @@ function renderSummary(tipo) {
   const table = document.getElementById(tipo === 'presencial' ? 'summaryPresencial' : 'summaryRemoto');
   if (!state.personas.length) { table.innerHTML = ''; return; }
 
-  const marcas = tipo === 'presencial' ? state.marcasPresencial : state.marcasRemoto;
   let html = '<thead><tr><th>Persona</th><th>Días</th>' +
     (tipo === 'presencial' ? '<th>Total $</th>' : '') + '</tr></thead><tbody>';
 
   state.personas.forEach(p => {
-    const cantidad = (marcas[p.id] || []).length;
+    let cantidad;
+    if (tipo === 'presencial') {
+      cantidad = diasQueCuentanPresencial(state.marcasPresencial[p.id] || {});
+    } else {
+      cantidad = (state.marcasRemoto[p.id] || []).length;
+    }
     html += `<tr><td>${escapeHtml(p.nombre)}</td><td class="num">${cantidad}</td>`;
     if (tipo === 'presencial') {
       const total = (Number(state.valores.racionamiento || 0) + Number(state.valores.movilidad || 0)) * cantidad;
@@ -302,12 +533,6 @@ function renderSummary(tipo) {
   });
   html += '</tbody>';
   table.innerHTML = html;
-}
-
-function escapeHtml(s) {
-  const div = document.createElement('div');
-  div.textContent = s;
-  return div.innerHTML;
 }
 
 // ---------------------------------------------------------------
@@ -327,34 +552,23 @@ document.getElementById('saveValuesBtn').addEventListener('click', async () => {
 });
 
 // ---------------------------------------------------------------
-// Resumen anual
+// Resumen anual: solo días remotos por mes
 // ---------------------------------------------------------------
 async function loadResumen() {
-  document.getElementById('resumenYear1').textContent = state.anio;
   document.getElementById('resumenYear2').textContent = state.anio;
 
-  const [marcasSnap, valoresSnap] = await Promise.all([
-    getDocs(query(collection(db, 'marcas'), where('anio', '==', state.anio))),
-    getDocs(query(collection(db, 'valoresMensuales'), where('anio', '==', state.anio)))
-  ]);
+  const marcasSnap = await getDocs(query(
+    collection(db, 'marcas'), where('anio', '==', state.anio), where('tipo', '==', 'remoto')
+  ));
 
-  const valoresPorMes = {};
-  valoresSnap.forEach(d => { valoresPorMes[d.data().mes] = d.data(); });
-
-  const diasPorPersonaMes = {}; // personaId -> { presencial: {mes: count}, remoto: {mes: count} }
+  const diasPorPersonaMes = {}; // personaId -> { mes: count }
   marcasSnap.forEach(d => {
     const data = d.data();
-    const pid = data.personaId;
-    diasPorPersonaMes[pid] = diasPorPersonaMes[pid] || { presencial: {}, remoto: {} };
-    diasPorPersonaMes[pid][data.tipo][data.mes] = (data.dias || []).length;
+    diasPorPersonaMes[data.personaId] = diasPorPersonaMes[data.personaId] || {};
+    diasPorPersonaMes[data.personaId][data.mes] = (data.dias || []).length;
   });
 
-  renderResumenTable('resumenMoney', true, valoresPorMes, diasPorPersonaMes);
-  renderResumenTable('resumenRemoto', false, valoresPorMes, diasPorPersonaMes);
-}
-
-function renderResumenTable(tableId, esDinero, valoresPorMes, diasPorPersonaMes) {
-  const table = document.getElementById(tableId);
+  const table = document.getElementById('resumenRemoto');
   table.innerHTML = '';
   const thead = document.createElement('thead');
   const trh = document.createElement('tr');
@@ -365,7 +579,6 @@ function renderResumenTable(tableId, esDinero, valoresPorMes, diasPorPersonaMes)
   table.appendChild(thead);
 
   const tbody = document.createElement('tbody');
-
   state.personas.forEach(p => {
     const tr = document.createElement('tr');
     const tdName = document.createElement('td');
@@ -375,24 +588,16 @@ function renderResumenTable(tableId, esDinero, valoresPorMes, diasPorPersonaMes)
 
     let totalPersona = 0;
     for (let m = 1; m <= 12; m++) {
-      const registro = diasPorPersonaMes[p.id] || { presencial: {}, remoto: {} };
-      let valor;
-      if (esDinero) {
-        const cant = registro.presencial[m] || 0;
-        const vm = valoresPorMes[m] || { racionamiento: 0, movilidad: 0 };
-        valor = (Number(vm.racionamiento || 0) + Number(vm.movilidad || 0)) * cant;
-      } else {
-        valor = registro.remoto[m] || 0;
-      }
+      const valor = (diasPorPersonaMes[p.id] || {})[m] || 0;
       totalPersona += valor;
       const td = document.createElement('td');
-      td.className = esDinero ? 'amount' : 'days';
-      td.textContent = esDinero ? formatMoney(valor) : valor;
+      td.className = 'days';
+      td.textContent = valor;
       tr.appendChild(td);
     }
     const tdTotal = document.createElement('td');
-    tdTotal.className = esDinero ? 'amount' : 'days';
-    tdTotal.textContent = esDinero ? formatMoney(totalPersona) : totalPersona;
+    tdTotal.className = 'days';
+    tdTotal.textContent = totalPersona;
     tr.appendChild(tdTotal);
     tbody.appendChild(tr);
   });

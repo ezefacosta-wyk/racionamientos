@@ -11,6 +11,11 @@
   --remoto-soft:#F1E6CC;
   --danger:#B3462C;
   --danger-soft:#F5DCD3;
+  --tipo-eze:#1F6F63;
+  --tipo-bou:#2E5C8A;
+  --tipo-c:#6B7280;
+  --tipo-f:#B3462C;
+  --tipo-v:#C99A2E;
   --radius:3px;
   font-size:16px;
 }
@@ -82,6 +87,24 @@ button{
   font-size:14px;
 }
 .period-picker select option{color:var(--ink);}
+
+.topbar-controls{display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+.view-toggle{
+  display:flex;
+  border:1px solid rgba(238,239,233,0.3);
+  border-radius:var(--radius);
+  overflow:hidden;
+}
+.view-btn{
+  background:transparent;
+  border:none;
+  color:rgba(238,239,233,0.65);
+  padding:7px 12px;
+  font-size:13px;
+  font-family:inherit;
+}
+.view-btn:not(:last-child){border-right:1px solid rgba(238,239,233,0.3);}
+.view-btn.active{background:var(--presencial);color:#fff;}
 
 .tabs{
   max-width:1200px;
@@ -253,8 +276,12 @@ table.summary-grid{
   flex-shrink:0;
 }
 .chip:hover{border-color:var(--ink-soft);}
-.chip.chip-on.tipo-presencial{background:var(--presencial);border-color:var(--presencial);color:#fff;}
 .chip.chip-on.tipo-remoto{background:var(--remoto);border-color:var(--remoto);color:#fff;}
+.chip.chip-on.mark-EZE{background:var(--tipo-eze);border-color:var(--tipo-eze);color:#fff;font-weight:600;}
+.chip.chip-on.mark-BOU{background:var(--tipo-bou);border-color:var(--tipo-bou);color:#fff;font-weight:600;}
+.chip.chip-on.mark-C{background:var(--tipo-c);border-color:var(--tipo-c);color:#fff;font-weight:600;}
+.chip.chip-on.mark-F{background:var(--tipo-f);border-color:var(--tipo-f);color:#fff;font-weight:600;}
+.chip.chip-on.mark-V{background:var(--tipo-v);border-color:var(--tipo-v);color:#fff;font-weight:600;}
 .chip.chip-disabled{cursor:default;opacity:0.3;}
 .chip.chip-disabled:hover{border-color:var(--rule-strong);}
 
@@ -477,4 +504,162 @@ table.summary-mini tr:last-child td{border-bottom:none;}
   .topbar-inner{padding:14px 16px 10px;}
   main{padding:16px;}
   .brand-text h1{font-size:16px;}
+}
+
+/* ---------- Leyenda de tipos de presencialidad ---------- */
+.type-legend{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:14px;
+  margin-bottom:14px;
+  font-size:12px;
+  color:var(--ink-soft);
+}
+.legend-item{display:flex;align-items:center;gap:5px;}
+.legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.dot-eze{background:var(--tipo-eze);}
+.dot-bou{background:var(--tipo-bou);}
+.dot-c{background:var(--tipo-c);}
+.dot-f{background:var(--tipo-f);}
+.dot-v{background:var(--tipo-v);}
+.legend-note{font-style:italic;}
+
+/* ---------- Vista horizontal (tabla) ---------- */
+.horizontal-view .grid-wrap{
+  overflow-x:auto;
+  border:1px solid var(--rule);
+  border-radius:var(--radius);
+  background:var(--paper-raised);
+}
+table.calendar-grid{
+  border-collapse:collapse;
+  width:100%;
+  font-size:13px;
+}
+.calendar-grid th, .calendar-grid td{
+  border-bottom:1px solid var(--rule);
+  border-right:1px solid var(--rule);
+  padding:6px 4px;
+  text-align:center;
+  white-space:nowrap;
+}
+.calendar-grid thead th{
+  background:var(--ink);
+  color:var(--paper-raised);
+  font-weight:500;
+  position:sticky;
+  top:0;
+  z-index:2;
+}
+.calendar-grid .col-name{
+  text-align:left;
+  padding-left:12px;
+  position:sticky;
+  left:0;
+  background:var(--paper-raised);
+  z-index:1;
+  font-weight:500;
+  min-width:150px;
+}
+.calendar-grid thead .col-name{background:var(--ink);z-index:3;color:var(--paper-raised);}
+.calendar-grid .weekday{
+  display:block;
+  font-size:9px;
+  text-transform:uppercase;
+  color:rgba(238,239,233,0.55);
+  font-weight:400;
+}
+.calendar-grid .day-cell{
+  width:34px;
+  cursor:pointer;
+  user-select:none;
+  color:var(--ink-soft);
+  font-family:'IBM Plex Mono',monospace;
+  font-size:11px;
+}
+.calendar-grid .day-cell:hover{background:var(--rule);}
+.calendar-grid .day-cell.holiday-cell{
+  background:repeating-linear-gradient(135deg,var(--danger-soft) 0 4px,var(--paper-raised) 4px 8px);
+  cursor:default;
+  color:var(--danger);
+}
+.calendar-grid .day-cell.mark-remoto{background:var(--remoto-soft);color:var(--remoto);font-weight:600;}
+.calendar-grid .day-cell.mark-EZE{background:var(--tipo-eze);color:#fff;font-weight:600;}
+.calendar-grid .day-cell.mark-BOU{background:var(--tipo-bou);color:#fff;font-weight:600;}
+.calendar-grid .day-cell.mark-C{background:var(--tipo-c);color:#fff;font-weight:600;}
+.calendar-grid .day-cell.mark-F{background:var(--tipo-f);color:#fff;font-weight:600;}
+.calendar-grid .day-cell.mark-V{background:var(--tipo-v);color:#fff;font-weight:600;}
+.calendar-grid .col-total{
+  font-family:'IBM Plex Mono',monospace;
+  font-weight:600;
+  min-width:64px;
+}
+
+/* ---------- Modal selector de tipo de marca ---------- */
+.modal-overlay{
+  position:fixed;
+  inset:0;
+  background:rgba(27,42,46,0.55);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:100;
+  padding:20px;
+}
+.modal-box{
+  background:var(--paper-raised);
+  border-radius:var(--radius);
+  padding:22px;
+  max-width:340px;
+  width:100%;
+}
+.modal-box h3{
+  font-size:16px;
+  margin:0 0 16px;
+  color:var(--ink);
+}
+.marker-options{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:8px;
+  margin-bottom:16px;
+}
+.marker-option{
+  border:2px solid var(--rule-strong);
+  border-radius:var(--radius);
+  background:var(--paper);
+  padding:10px 4px;
+  text-align:center;
+  cursor:pointer;
+  font-family:inherit;
+}
+.marker-option .code{
+  display:block;
+  font-family:'IBM Plex Mono',monospace;
+  font-size:15px;
+  font-weight:600;
+  color:var(--ink);
+}
+.marker-option .label{
+  display:block;
+  font-size:10px;
+  color:var(--ink-soft);
+  margin-top:2px;
+}
+.marker-option.selected{border-color:var(--ink);background:var(--paper-raised);}
+.marker-option.opt-EZE .code{color:var(--tipo-eze);}
+.marker-option.opt-BOU .code{color:var(--tipo-bou);}
+.marker-option.opt-C .code{color:var(--tipo-c);}
+.marker-option.opt-F .code{color:var(--tipo-f);}
+.marker-option.opt-V .code{color:var(--tipo-v);}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;}
+.btn-remove-mark{
+  background:transparent;
+  border:1px solid var(--danger);
+  color:var(--danger);
+  border-radius:var(--radius);
+  padding:8px 12px;
+  font-size:13px;
+  margin-right:auto;
 }
