@@ -12,15 +12,16 @@
 // ============================================================
 
 export const firebaseConfig = {
-  apiKey: "TU_API_KEY",
-  authDomain: "TU_PROYECTO.firebaseapp.com",
-  projectId: "TU_PROYECTO",
-  storageBucket: "TU_PROYECTO.appspot.com",
-  messagingSenderId: "000000000000",
-  appId: "TU_APP_ID"
+ apiKey: "AIzaSyDy1J5nLfbNwziWuBcOfBPq3nWOb_us5UE",
+  authDomain: "racionamientos.firebaseapp.com",
+  projectId: "racionamientos",
+  storageBucket: "racionamientos.firebasestorage.app",
+  messagingSenderId: "96280832493",
+  appId: "1:96280832493:web:e778b43fcda97f18199fe4",
+  measurementId: "G-YGGSHVGXQ6"
 };
 
 // Código de administrador: quien lo ingrese en la pestaña "Admin" puede
 // agregar/quitar personas y editar racionamiento/movilidad.
 // Cambialo por el que quieras antes de publicar el sitio.
-export const ADMIN_PASSCODE = "cambiar-este-codigo";
+export const ADMIN_PASSCODE = "Redes2026#!";
