@@ -67,7 +67,7 @@ let state = {
   anio: today.getFullYear(),
   mes: today.getMonth() + 1,
   personas: [],             // [{id, nombre, orden}]
-  marcasPresencial: {},     // { personaId: { "5": "EZE", "6": "BOU", ... } }
+  marcasPresencial: {},     // { personaId: { dias: {"5":"EZE",...}, notas: {"5":"texto",...} } }
   marcasRemoto: {},         // { personaId: [dias...] }
   feriados: {},             // { "mes-dia": {id, nombre} } para el anio actual
   valores: { racionamiento: 0, movilidad: 0 },
@@ -167,7 +167,10 @@ function subscribeToPeriod() {
     where('anio', '==', state.anio), where('mes', '==', state.mes), where('tipo', '==', 'presencial'));
   unsubPresencial = onSnapshot(qPres, (snap) => {
     state.marcasPresencial = {};
-    snap.forEach(d => { state.marcasPresencial[d.data().personaId] = d.data().dias || {}; });
+    snap.forEach(d => {
+      const data = d.data();
+      state.marcasPresencial[data.personaId] = { dias: data.dias || {}, notas: data.notas || {} };
+    });
     renderAll();
   }, (err) => setStatus('Error leyendo presencialidad: ' + err.message, 'error'));
 
@@ -210,7 +213,7 @@ function subscribePersonas() {
   unsubPersonas = onSnapshot(collection(db, 'personas'), (snap) => {
     const list = [];
     snap.forEach(d => list.push({ id: d.id, ...d.data() }));
-    list.sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0) || a.nombre.localeCompare(b.nombre));
+    list.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
     state.personas = list;
     renderAll();
     renderPersonAdminList();
@@ -239,6 +242,10 @@ function renderAll() {
 // ---------------------------------------------------------------
 function diasQueCuentanPresencial(mapaDias) {
   return Object.values(mapaDias || {}).filter(code => cuentaParaTotal(code)).length;
+}
+
+function getRegistroPresencial(personaId) {
+  return state.marcasPresencial[personaId] || { dias: {}, notas: {} };
 }
 
 // ---------------------------------------------------------------
@@ -308,12 +315,13 @@ function renderCalendar(tipo) {
       const chip = document.createElement('div');
       let marked, code;
       if (tipo === 'presencial') {
-        const mapaDias = state.marcasPresencial[p.id] || {};
-        code = mapaDias[dayNum];
+        const registro = getRegistroPresencial(p.id);
+        code = registro.dias[dayNum];
+        const nota = registro.notas[dayNum];
         marked = !!code;
-        chip.className = 'chip' + (marked ? ' chip-on mark-' + code : '') + (feriado ? ' chip-disabled' : '');
+        chip.className = 'chip' + (marked ? ' chip-on mark-' + code : '') + (nota ? ' has-note' : '') + (feriado ? ' chip-disabled' : '');
         chip.textContent = initials(p.nombre);
-        chip.title = p.nombre + (marked ? ' — ' + code : '') + (feriado ? ' — no disponible en feriado' : '');
+        chip.title = p.nombre + (marked ? ' — ' + code : '') + (nota ? ' — Nota: ' + nota : '') + (feriado ? ' — no disponible en feriado' : '');
       } else {
         const diasMarcados = state.marcasRemoto[p.id] || [];
         marked = diasMarcados.includes(dayNum);
@@ -384,7 +392,9 @@ function renderHorizontal(tipo) {
     tdName.textContent = p.nombre;
     tr.appendChild(tdName);
 
-    const mapaDias = tipo === 'presencial' ? (state.marcasPresencial[p.id] || {}) : null;
+    const registroPresencial = tipo === 'presencial' ? getRegistroPresencial(p.id) : null;
+    const mapaDias = tipo === 'presencial' ? registroPresencial.dias : null;
+    const mapaNotas = tipo === 'presencial' ? registroPresencial.notas : null;
     const diasMarcadosRemoto = tipo === 'remoto' ? (state.marcasRemoto[p.id] || []) : null;
 
     for (let d = 1; d <= nDias; d++) {
@@ -398,7 +408,9 @@ function renderHorizontal(tipo) {
         td.title = 'Feriado' + (feriado.nombre ? ' — ' + feriado.nombre : '');
       } else if (tipo === 'presencial') {
         const code = mapaDias[d];
+        const nota = mapaNotas[d];
         if (code) { td.classList.add('mark-' + code); td.textContent = code; }
+        if (nota) { td.classList.add('has-note'); td.title = 'Nota: ' + nota; }
         if (state.selection.presencial.has(p.id + '|' + d)) td.classList.add('cell-selected');
         td.addEventListener('click', () => {
           if (state.selectMode.presencial) toggleCellSelection('presencial', p.id, d, td);
@@ -525,17 +537,22 @@ function exitSelectMode(tipo) {
 
 async function applySelectionPresencial(code) {
   const grouped = {}; // personaId -> { dia: code | deleteField() }
+  const groupedNotas = {}; // personaId -> { dia: deleteField() } (solo al quitar)
   state.selection.presencial.forEach(key => {
     const [personaId, diaStr] = key.split('|');
     grouped[personaId] = grouped[personaId] || {};
     grouped[personaId][diaStr] = code === null ? deleteField() : code;
+    if (code === null) {
+      groupedNotas[personaId] = groupedNotas[personaId] || {};
+      groupedNotas[personaId][diaStr] = deleteField();
+    }
   });
   const cantidad = state.selection.presencial.size;
-  const writes = Object.entries(grouped).map(([personaId, diasPatch]) =>
-    setDoc(doc(db, 'marcas', `${personaId}_${state.anio}_${mesId()}_presencial`), {
-      personaId, anio: state.anio, mes: state.mes, tipo: 'presencial', dias: diasPatch
-    }, { merge: true })
-  );
+  const writes = Object.entries(grouped).map(([personaId, diasPatch]) => {
+    const payload = { personaId, anio: state.anio, mes: state.mes, tipo: 'presencial', dias: diasPatch };
+    if (groupedNotas[personaId]) payload.notas = groupedNotas[personaId];
+    return setDoc(doc(db, 'marcas', `${personaId}_${state.anio}_${mesId()}_presencial`), payload, { merge: true });
+  });
   try {
     await Promise.all(writes);
     showToast(code === null ? `Marca quitada en ${cantidad} días` : `${code} aplicado en ${cantidad} días`);
@@ -581,12 +598,12 @@ function handleMarkClick(tipo, persona, dia) {
     toggleRemoto(persona.id, dia, diasActuales);
     return;
   }
-  const mapaDias = state.marcasPresencial[persona.id] || {};
-  const codeActual = mapaDias[dia];
+  const registro = getRegistroPresencial(persona.id);
+  const codeActual = registro.dias[dia];
   if (!codeActual) {
-    setMarcaPresencial(persona.id, dia, TIPO_DEFAULT);
+    setMarcaPresencial(persona.id, dia, TIPO_DEFAULT, '');
   } else {
-    openMarkerModal(persona, dia, codeActual);
+    openMarkerModal(persona, dia, codeActual, registro.notas[dia] || '');
   }
 }
 
@@ -602,12 +619,13 @@ async function toggleRemoto(personaId, dia, diasActuales) {
   }
 }
 
-async function setMarcaPresencial(personaId, dia, code) {
+async function setMarcaPresencial(personaId, dia, code, nota) {
   const ref = doc(db, 'marcas', `${personaId}_${state.anio}_${mesId()}_presencial`);
   try {
     await setDoc(ref, {
       personaId, anio: state.anio, mes: state.mes, tipo: 'presencial',
-      dias: { [dia]: code }
+      dias: { [dia]: code },
+      notas: { [dia]: nota ? nota : deleteField() }
     }, { merge: true });
   } catch (err) {
     showToast('No se pudo guardar: ' + err.message);
@@ -617,7 +635,7 @@ async function setMarcaPresencial(personaId, dia, code) {
 async function quitarMarcaPresencial(personaId, dia) {
   const ref = doc(db, 'marcas', `${personaId}_${state.anio}_${mesId()}_presencial`);
   try {
-    await setDoc(ref, { dias: { [dia]: deleteField() } }, { merge: true });
+    await setDoc(ref, { dias: { [dia]: deleteField() }, notas: { [dia]: deleteField() } }, { merge: true });
   } catch (err) {
     showToast('No se pudo guardar: ' + err.message);
   }
@@ -629,9 +647,10 @@ async function quitarMarcaPresencial(personaId, dia) {
 const markerModal = document.getElementById('markerModal');
 let markerCtx = null; // { personaId, dia }
 
-function openMarkerModal(persona, dia, codeActual) {
+function openMarkerModal(persona, dia, codeActual, notaActual) {
   markerCtx = { personaId: persona.id, dia };
   document.getElementById('markerModalTitle').textContent = `${persona.nombre} — día ${dia}`;
+  document.getElementById('markerNota').value = notaActual || '';
   const opts = document.getElementById('markerOptions');
   opts.innerHTML = '';
   TIPOS_PRESENCIAL.forEach(t => {
@@ -640,7 +659,8 @@ function openMarkerModal(persona, dia, codeActual) {
     btn.className = 'marker-option opt-' + t.code + (t.code === codeActual ? ' selected' : '');
     btn.innerHTML = `<span class="code">${t.code}</span><span class="label">${t.label}</span>`;
     btn.addEventListener('click', async () => {
-      await setMarcaPresencial(markerCtx.personaId, markerCtx.dia, t.code);
+      const nota = document.getElementById('markerNota').value.trim();
+      await setMarcaPresencial(markerCtx.personaId, markerCtx.dia, t.code, nota);
       closeMarkerModal();
     });
     opts.appendChild(btn);
@@ -674,7 +694,7 @@ function renderSummary(tipo) {
   state.personas.forEach(p => {
     let cantidad;
     if (tipo === 'presencial') {
-      cantidad = diasQueCuentanPresencial(state.marcasPresencial[p.id] || {});
+      cantidad = diasQueCuentanPresencial(getRegistroPresencial(p.id).dias);
     } else {
       cantidad = (state.marcasRemoto[p.id] || []).length;
     }
