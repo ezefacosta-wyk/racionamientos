@@ -72,7 +72,9 @@ let state = {
   feriados: {},             // { "mes-dia": {id, nombre} } para el anio actual
   valores: { racionamiento: 0, movilidad: 0 },
   isAdmin: sessionStorage.getItem('isAdmin') === 'true',
-  vista: localStorage.getItem('vistaPreferida') || 'calendario'
+  vista: localStorage.getItem('vistaPreferida') || 'calendario',
+  selectMode: { presencial: false, remoto: false },
+  selection: { presencial: new Set(), remoto: new Set() } // "personaId|dia"
 };
 
 let unsubPersonas = null;
@@ -310,7 +312,7 @@ function renderCalendar(tipo) {
         code = mapaDias[dayNum];
         marked = !!code;
         chip.className = 'chip' + (marked ? ' chip-on mark-' + code : '') + (feriado ? ' chip-disabled' : '');
-        chip.textContent = marked ? code[0] : initials(p.nombre);
+        chip.textContent = initials(p.nombre);
         chip.title = p.nombre + (marked ? ' — ' + code : '') + (feriado ? ' — no disponible en feriado' : '');
       } else {
         const diasMarcados = state.marcasRemoto[p.id] || [];
@@ -348,6 +350,7 @@ function renderHorizontal(tipo) {
   }
   view.style.display = '';
   emptyState.hidden = true;
+  renderSelectionToolbar(tipo);
 
   const nDias = diasEnMes(state.anio, state.mes);
 
@@ -396,11 +399,19 @@ function renderHorizontal(tipo) {
       } else if (tipo === 'presencial') {
         const code = mapaDias[d];
         if (code) { td.classList.add('mark-' + code); td.textContent = code; }
-        td.addEventListener('click', () => handleMarkClick(tipo, p, d));
+        if (state.selection.presencial.has(p.id + '|' + d)) td.classList.add('cell-selected');
+        td.addEventListener('click', () => {
+          if (state.selectMode.presencial) toggleCellSelection('presencial', p.id, d, td);
+          else handleMarkClick(tipo, p, d);
+        });
       } else {
         const marked = diasMarcadosRemoto.includes(d);
         if (marked) { td.classList.add('mark-remoto'); td.textContent = 'X'; }
-        td.addEventListener('click', () => handleMarkClick(tipo, p, d));
+        if (state.selection.remoto.has(p.id + '|' + d)) td.classList.add('cell-selected');
+        td.addEventListener('click', () => {
+          if (state.selectMode.remoto) toggleCellSelection('remoto', p.id, d, td);
+          else handleMarkClick(tipo, p, d);
+        });
       }
       tr.appendChild(td);
     }
@@ -421,6 +432,143 @@ function renderHorizontal(tipo) {
 
     body.appendChild(tr);
   });
+}
+
+// ---------------------------------------------------------------
+// Selección múltiple (solo vista horizontal)
+// ---------------------------------------------------------------
+function renderSelectionToolbar(tipo) {
+  const bar = document.getElementById(tipo === 'presencial' ? 'selectionToolbarPresencial' : 'selectionToolbarRemoto');
+  if (!bar) return;
+  bar.innerHTML = '';
+
+  const modeBtn = document.createElement('button');
+  modeBtn.type = 'button';
+  modeBtn.className = 'btn-select-mode' + (state.selectMode[tipo] ? ' active' : '');
+  modeBtn.textContent = state.selectMode[tipo] ? 'Cancelar selección' : 'Seleccionar varios días';
+  modeBtn.addEventListener('click', () => {
+    if (state.selectMode[tipo]) exitSelectMode(tipo);
+    else {
+      state.selectMode[tipo] = true;
+      state.selection[tipo].clear();
+      renderSelectionToolbar(tipo);
+      renderHorizontal(tipo);
+    }
+  });
+  bar.appendChild(modeBtn);
+
+  if (!state.selectMode[tipo]) return;
+
+  const count = state.selection[tipo].size;
+  const countEl = document.createElement('span');
+  countEl.className = 'selection-count';
+  countEl.textContent = count ? `${count} día${count === 1 ? '' : 's'} seleccionado${count === 1 ? '' : 's'}` : 'Tocá los días a marcar';
+  bar.appendChild(countEl);
+
+  if (!count) return;
+
+  if (tipo === 'presencial') {
+    const typesWrap = document.createElement('div');
+    typesWrap.className = 'selection-types';
+    TIPOS_PRESENCIAL.forEach(t => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'bulk-type-btn opt-' + t.code;
+      btn.textContent = t.code;
+      btn.title = t.label;
+      btn.addEventListener('click', () => applySelectionPresencial(t.code));
+      typesWrap.appendChild(btn);
+    });
+    bar.appendChild(typesWrap);
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'btn-remove-mark';
+    removeBtn.textContent = 'Quitar marca';
+    removeBtn.addEventListener('click', () => applySelectionPresencial(null));
+    bar.appendChild(removeBtn);
+  } else {
+    const markBtn = document.createElement('button');
+    markBtn.type = 'button';
+    markBtn.className = 'bulk-type-btn opt-remoto';
+    markBtn.textContent = 'Marcar remoto';
+    markBtn.addEventListener('click', () => applySelectionRemoto('mark'));
+    bar.appendChild(markBtn);
+
+    const unmarkBtn = document.createElement('button');
+    unmarkBtn.type = 'button';
+    unmarkBtn.className = 'btn-remove-mark';
+    unmarkBtn.textContent = 'Quitar remoto';
+    unmarkBtn.addEventListener('click', () => applySelectionRemoto('unmark'));
+    bar.appendChild(unmarkBtn);
+  }
+}
+
+function toggleCellSelection(tipo, personaId, dia, td) {
+  const key = personaId + '|' + dia;
+  if (state.selection[tipo].has(key)) {
+    state.selection[tipo].delete(key);
+    td.classList.remove('cell-selected');
+  } else {
+    state.selection[tipo].add(key);
+    td.classList.add('cell-selected');
+  }
+  renderSelectionToolbar(tipo);
+}
+
+function exitSelectMode(tipo) {
+  state.selectMode[tipo] = false;
+  state.selection[tipo].clear();
+  renderSelectionToolbar(tipo);
+  renderHorizontal(tipo);
+}
+
+async function applySelectionPresencial(code) {
+  const grouped = {}; // personaId -> { dia: code | deleteField() }
+  state.selection.presencial.forEach(key => {
+    const [personaId, diaStr] = key.split('|');
+    grouped[personaId] = grouped[personaId] || {};
+    grouped[personaId][diaStr] = code === null ? deleteField() : code;
+  });
+  const cantidad = state.selection.presencial.size;
+  const writes = Object.entries(grouped).map(([personaId, diasPatch]) =>
+    setDoc(doc(db, 'marcas', `${personaId}_${state.anio}_${mesId()}_presencial`), {
+      personaId, anio: state.anio, mes: state.mes, tipo: 'presencial', dias: diasPatch
+    }, { merge: true })
+  );
+  try {
+    await Promise.all(writes);
+    showToast(code === null ? `Marca quitada en ${cantidad} días` : `${code} aplicado en ${cantidad} días`);
+  } catch (err) {
+    showToast('No se pudo guardar: ' + err.message);
+  }
+  exitSelectMode('presencial');
+}
+
+async function applySelectionRemoto(action) {
+  const grouped = {}; // personaId -> [dias]
+  state.selection.remoto.forEach(key => {
+    const [personaId, diaStr] = key.split('|');
+    grouped[personaId] = grouped[personaId] || [];
+    grouped[personaId].push(Number(diaStr));
+  });
+  const cantidad = state.selection.remoto.size;
+  const writes = Object.entries(grouped).map(([personaId, dias]) => {
+    const actuales = state.marcasRemoto[personaId] || [];
+    const nuevo = action === 'mark'
+      ? Array.from(new Set([...actuales, ...dias])).sort((a, b) => a - b)
+      : actuales.filter(d => !dias.includes(d));
+    return setDoc(doc(db, 'marcas', `${personaId}_${state.anio}_${mesId()}_remoto`), {
+      personaId, anio: state.anio, mes: state.mes, tipo: 'remoto', dias: nuevo
+    });
+  });
+  try {
+    await Promise.all(writes);
+    showToast(action === 'mark' ? `Remoto marcado en ${cantidad} días` : `Remoto quitado en ${cantidad} días`);
+  } catch (err) {
+    showToast('No se pudo guardar: ' + err.message);
+  }
+  exitSelectMode('remoto');
 }
 
 // ---------------------------------------------------------------
