@@ -16,6 +16,7 @@
   --tipo-c:#6B7280;
   --tipo-f:#B3462C;
   --tipo-v:#C99A2E;
+  --tipo-l:#7A5C99;
   --weekend-bg:#DFE6E2;
   --weekend-header:#2E4145;
   --radius:3px;
@@ -286,6 +287,7 @@ table.summary-grid{
 .chip.chip-on.mark-C{background:var(--tipo-c);border-color:var(--tipo-c);color:#fff;font-weight:600;}
 .chip.chip-on.mark-F{background:var(--tipo-f);border-color:var(--tipo-f);color:#fff;font-weight:600;}
 .chip.chip-on.mark-V{background:var(--tipo-v);border-color:var(--tipo-v);color:#fff;font-weight:600;}
+.chip.chip-on.mark-L{background:var(--tipo-l);border-color:var(--tipo-l);color:#fff;font-weight:600;}
 .chip.chip-disabled{cursor:default;opacity:0.3;}
 .chip.chip-disabled:hover{border-color:var(--rule-strong);}
 
@@ -527,6 +529,7 @@ table.summary-mini tr:last-child td{border-bottom:none;}
 .dot-c{background:var(--tipo-c);}
 .dot-f{background:var(--tipo-f);}
 .dot-v{background:var(--tipo-v);}
+.dot-l{background:var(--tipo-l);}
 .legend-note{font-style:italic;}
 
 /* ---------- Vista horizontal (tabla) ---------- */
@@ -596,6 +599,7 @@ table.calendar-grid{
 .calendar-grid .day-cell.mark-C{background:var(--tipo-c);color:#fff;font-weight:600;}
 .calendar-grid .day-cell.mark-F{background:var(--tipo-f);color:#fff;font-weight:600;}
 .calendar-grid .day-cell.mark-V{background:var(--tipo-v);color:#fff;font-weight:600;}
+.calendar-grid .day-cell.mark-L{background:var(--tipo-l);color:#fff;font-weight:600;}
 .calendar-grid .col-total{
   font-family:'IBM Plex Mono',monospace;
   font-weight:600;
@@ -662,6 +666,7 @@ table.calendar-grid{
 .marker-option.opt-C .code{color:var(--tipo-c);}
 .marker-option.opt-F .code{color:var(--tipo-f);}
 .marker-option.opt-V .code{color:var(--tipo-v);}
+.marker-option.opt-L .code{color:var(--tipo-l);}
 .modal-actions{display:flex;gap:8px;justify-content:flex-end;}
 .btn-remove-mark{
   background:transparent;
@@ -702,6 +707,17 @@ table.calendar-grid{
   white-space:nowrap;
 }
 .selection-types{display:flex;gap:6px;flex-wrap:wrap;}
+.selection-note-wrap{flex-basis:100%;}
+.selection-note-input{
+  width:100%;
+  max-width:420px;
+  border:1px solid var(--rule-strong);
+  border-radius:var(--radius);
+  padding:6px 9px;
+  font-family:inherit;
+  font-size:13px;
+  resize:vertical;
+}
 .bulk-type-btn{
   border:2px solid var(--rule-strong);
   border-radius:var(--radius);
@@ -717,6 +733,7 @@ table.calendar-grid{
 .bulk-type-btn.opt-C{color:var(--tipo-c);border-color:var(--tipo-c);}
 .bulk-type-btn.opt-F{color:var(--tipo-f);border-color:var(--tipo-f);}
 .bulk-type-btn.opt-V{color:var(--tipo-v);border-color:var(--tipo-v);}
+.bulk-type-btn.opt-L{color:var(--tipo-l);border-color:var(--tipo-l);}
 .bulk-type-btn.opt-remoto{color:var(--remoto);border-color:var(--remoto);}
 .calendar-grid .day-cell.cell-selected{
   box-shadow:inset 0 0 0 2px var(--ink);

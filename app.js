@@ -34,7 +34,8 @@ const TIPOS_PRESENCIAL = [
   { code: 'BOU', label: 'Bouchard', cuenta: true },
   { code: 'C', label: 'Comisión', cuenta: false },
   { code: 'F', label: 'Falta', cuenta: false },
-  { code: 'V', label: 'Vacaciones', cuenta: false }
+  { code: 'V', label: 'Vacaciones', cuenta: false },
+  { code: 'L', label: 'Licencia', cuenta: false }
 ];
 const TIPO_DEFAULT = 'EZE';
 function cuentaParaTotal(code) {
@@ -74,7 +75,8 @@ let state = {
   isAdmin: sessionStorage.getItem('isAdmin') === 'true',
   vista: localStorage.getItem('vistaPreferida') || 'calendario',
   selectMode: { presencial: false, remoto: false },
-  selection: { presencial: new Set(), remoto: new Set() } // "personaId|dia"
+  selection: { presencial: new Set(), remoto: new Set() }, // "personaId|dia"
+  selectionNota: { presencial: '' }
 };
 
 let unsubPersonas = null;
@@ -482,6 +484,17 @@ function renderSelectionToolbar(tipo) {
   if (!count) return;
 
   if (tipo === 'presencial') {
+    const notaWrap = document.createElement('div');
+    notaWrap.className = 'selection-note-wrap';
+    const notaInput = document.createElement('textarea');
+    notaInput.className = 'selection-note-input';
+    notaInput.rows = 1;
+    notaInput.placeholder = 'Nota para estos días (opcional) — ej: Comisión en Ezeiza';
+    notaInput.value = state.selectionNota.presencial;
+    notaInput.addEventListener('input', () => { state.selectionNota.presencial = notaInput.value; });
+    notaWrap.appendChild(notaInput);
+    bar.appendChild(notaWrap);
+
     const typesWrap = document.createElement('div');
     typesWrap.className = 'selection-types';
     TIPOS_PRESENCIAL.forEach(t => {
@@ -490,7 +503,7 @@ function renderSelectionToolbar(tipo) {
       btn.className = 'bulk-type-btn opt-' + t.code;
       btn.textContent = t.code;
       btn.title = t.label;
-      btn.addEventListener('click', () => applySelectionPresencial(t.code));
+      btn.addEventListener('click', () => applySelectionPresencial(t.code, state.selectionNota.presencial));
       typesWrap.appendChild(btn);
     });
     bar.appendChild(typesWrap);
@@ -533,13 +546,15 @@ function toggleCellSelection(tipo, personaId, dia, td) {
 function exitSelectMode(tipo) {
   state.selectMode[tipo] = false;
   state.selection[tipo].clear();
+  if (tipo === 'presencial') state.selectionNota.presencial = '';
   renderSelectionToolbar(tipo);
   renderHorizontal(tipo);
 }
 
-async function applySelectionPresencial(code) {
+async function applySelectionPresencial(code, nota) {
   const grouped = {}; // personaId -> { dia: code | deleteField() }
-  const groupedNotas = {}; // personaId -> { dia: deleteField() } (solo al quitar)
+  const groupedNotas = {}; // personaId -> { dia: texto | deleteField() }
+  const notaLimpia = (nota || '').trim();
   state.selection.presencial.forEach(key => {
     const [personaId, diaStr] = key.split('|');
     grouped[personaId] = grouped[personaId] || {};
@@ -547,6 +562,9 @@ async function applySelectionPresencial(code) {
     if (code === null) {
       groupedNotas[personaId] = groupedNotas[personaId] || {};
       groupedNotas[personaId][diaStr] = deleteField();
+    } else if (notaLimpia) {
+      groupedNotas[personaId] = groupedNotas[personaId] || {};
+      groupedNotas[personaId][diaStr] = notaLimpia;
     }
   });
   const cantidad = state.selection.presencial.size;
