@@ -127,6 +127,8 @@ function applyViewState() {
   document.getElementById('horizontalViewPresencial').hidden = esCal;
   document.getElementById('calendarViewRemoto').hidden = !esCal;
   document.getElementById('horizontalViewRemoto').hidden = esCal;
+  document.getElementById('summaryWrapPresencial').hidden = !esCal;
+  document.getElementById('summaryWrapRemoto').hidden = !esCal;
 }
 document.getElementById('viewToggle').addEventListener('click', (e) => {
   const btn = e.target.closest('.view-btn');
